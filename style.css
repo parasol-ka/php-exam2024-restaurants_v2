@@ -1,0 +1,17 @@
+#topresto_employes_container{
+    padding: 2rem;
+    border: 0.1rem solid black;
+    display: flex;
+    flex-direction: column;
+    row-gap: 1rem;
+}
+.employes_icons {
+    width: 35px;
+}
+.resto_links {
+    text-decoration: none;
+    color: black;
+}
+#resto_form_container{
+    padding-top: 2rem;
+}
