@@ -19,10 +19,10 @@
             $verifyRestaurant=$bd->prepare("SELECT * FROM restaurants WHERE id_restaurant=:id_resto");
             $verifyRestaurant->bindvalue("id_resto", $id_restaurant);
             $verifyRestaurant->execute();
-            $resto=$reqRestaurant->fetch();
+            $resto=$verifyRestaurant->fetch();
 
             if($resto){
-                $reqEmployes=$bd->prepare("SELECT CONCAT(e.nom, " - ", e.prenom) AS nom_prenom, e.manager, SUM(b.prix*v.nombre) AS montant 
+                $reqEmployes=$bd->prepare("SELECT CONCAT(e.nom, ' - ', e.prenom) AS nom_prenom, r.id_restaurant, e.manager, SUM(b.prix*v.nombre) AS montant 
                                         FROM restaurants AS r JOIN employes AS e ON r.id_restaurant=e.id_restaurant 
                                         JOIN commandes AS c ON e.id_employe=c.id_employe 
                                         JOIN ventes AS v ON c.id_commande=v.id_commande 
@@ -33,22 +33,21 @@
                 $reqEmployes->bindvalue("id_resto", $id_restaurant);
                 $reqEmployes->execute();
 
-                $reqTotal=$bd->prepare("SELECT SUM(sousrequete.montant) AS total FROM 
-                                        (SELECT CONCAT(e.nom, " - ", e.prenom) AS nom_prenom, e.manager, SUM(b.prix*v.nombre) AS montant FROM restaurants AS r 
-                                        JOIN employes AS e ON r.id_restaurant=e.id_restaurant 
-                                        JOIN commandes AS c ON e.id_employe=c.id_employe 
-                                        JOIN ventes AS v ON c.id_commande=v.id_commande 
-                                        JOIN burgers AS b ON v.id_burger=b.id_burger 
-                                        WHERE e.travail_encore=1 AND r.id_restaurant=:id_resto 
-                                        GROUP BY e.id_employe) 
-                                        AS sousrequete;");
-                $reqTotal->bindvalues("id_resto", $id_restaurant);
+                $reqTotal=$bd->prepare("SELECT sousrequete.nom, ROUND(SUM(sousrequete.montant)) AS total FROM 
+                                    (SELECT CONCAT(e.nom, ' - ', e.prenom) AS nom_prenom, r.id_restaurant, e.manager, SUM(b.prix*v.nombre) AS montant, r.nom FROM restaurants AS r 
+                                    JOIN employes AS e ON r.id_restaurant=e.id_restaurant 
+                                    JOIN commandes AS c ON e.id_employe=c.id_employe 
+                                    JOIN ventes AS v ON c.id_commande=v.id_commande 
+                                    JOIN burgers AS b ON v.id_burger=b.id_burger 
+                                    WHERE e.travail_encore=1 AND r.id_restaurant=:id_resto 
+                                    GROUP BY e.id_employe) AS sousrequete;");
+                $reqTotal->bindvalue("id_resto", $id_restaurant);
                 $reqTotal->execute();
-                $total=$reqTotal->fetch();
-                $total_resto=$total["total"];
-            }
+                
+                
+            }else {header("Location:index.php"); $id_restaurant=NULL;}
 
-        }
+        }else {header("Location:index.php"); $id_restaurant=NULL;}
     }
 
 
@@ -80,7 +79,7 @@
 
 
                     echo "<div id='top_restaurant_line_container'>$line_nbr : 
-                        <img src='flags/$country_code.webp'> $town_name : <a href='index.php?resto=$id_resto' class='resto_links' $bold_style>$resto_name</a><br>
+                        <img src='flags/$country_code.webp'> $town_name : <a href='index.php?resto=$id_resto#resto_employes_container' class='resto_links' $bold_style>$resto_name</a><br>
                         $resto_description<br>";
                         if($managers_nbr>0){
                             for ($i=0; $i < $managers_nbr; $i++) { 
@@ -102,13 +101,43 @@
                                 $id_resto_select=$restaurants["id_restaurant"];
                                 $resto_select_name=$restaurants["nom"];
 
-                                echo "<option value='$id_resto_select'>$resto_select_name</option>";
+                                if($id_resto_select==$id_restaurant){$selected="selected";}else{$selected="";}
+
+                                echo "<option value='$id_resto_select' $selected>$resto_select_name</option>";
                         }
                     ?>
                 </select>
                 <input type="submit" value="Voir les employés">
             </form>
+            <?php
+                if(isset($id_restaurant)){
+                    echo "<div id='resto_employes_container'>";
 
+                    if($reqEmployes->rowCount() > 0){
+                        while ($employes=$reqEmployes->fetch()){
+                            $employe_name=$employes["nom_prenom"];
+                            $manager_bool=$employes["manager"];
+                            $total_per_employe=$employes["montant"];
+                            if($manager_bool){$bold_style_manager="style='font-weight: bold;'";}else{$bold_style_manager="";}
+
+
+                            echo "<div class='employes'><p $bold_style_manager>$employe_name</p><p>$total_per_employe €</p></div>";
+                        }
+
+                        $total=$reqTotal->fetch();
+
+                        if($total){
+                            $total_resto=$total["total"];
+                            $resto_name_total=$total["nom"];
+            
+                            echo "<p>Le total des ventes pour $resto_name_total est de : $total_resto €</p>";
+                        }
+                    }else {echo"Il n'y a pas d'employés dans ce restaurant";}
+                    
+
+                    echo "</div>";
+                }
+            ?>
         </div>
     </main>
 </body>
